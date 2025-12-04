@@ -6,8 +6,7 @@ from transformers import (
     Qwen2AudioForConditionalGeneration,
     AutoProcessor,
     Trainer,
-    TrainingArguments,
-    BitsAndBytesConfig
+    TrainingArguments
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 import os
@@ -22,18 +21,9 @@ print(f"({MODEL_PATH})" if os.path.exists(MODEL_PATH) else f"({MODEL_ID})")
 
 processor = AutoProcessor.from_pretrained(MODEL_PATH if os.path.exists(MODEL_PATH) else MODEL_ID)
 
-bnb_config = BitsAndBytesConfig(
-    load_in_4bit=True,
-    bnb_4bit_use_double_quant=True,
-    bnb_4bit_quant_type="nf4",
-    bnb_4bit_compute_dtype=torch.bfloat16
-)
-
 model = Qwen2AudioForConditionalGeneration.from_pretrained(
     MODEL_PATH if os.path.exists(MODEL_PATH) else MODEL_ID,
-    quantization_config=bnb_config,
-    device_map="auto",
-    attn_implementation="flash_attention_2" # Use "eager" if flash attn not installed
+    device_map="auto"
 )
 
 # Prepare model for LoRA
@@ -62,9 +52,13 @@ raw_data = load_data(DATA_FILE)
 
 print("Processing dataset...")
 audios = []
+count = 0
 for sample in raw_data:
+    print(f"\r{count}/{len(raw_data)}")
     audio, _ = librosa.load(sample.pop('audio'), sr=processor.feature_extractor.sampling_rate)
     audios.append(audio)
+    count += 1
+print()
 
 text = processor.apply_chat_templates(raw_data, add_generation_prompt=True, tokenize=False)
 inputs = processor(text=text, audios=audios, return_tensors="pt", padding=True)
