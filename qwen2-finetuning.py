@@ -66,8 +66,7 @@ print("Processing dataset...")
 audios = []
 text_prompts = []
 instruction_lens = []
-count = 0
-for sample in enumerate(raw_data):
+for count, sample in enumerate(raw_data):
     print(f"\r{count}/{len(raw_data)}", end="")
     audio, _ = librosa.load(sample['audio'], sr=processor.feature_extractor.sampling_rate)
     audios.append(audio)
@@ -89,7 +88,6 @@ for sample in enumerate(raw_data):
     instruction_lens.append(len(processor.apply_chat_template([messages[0]], add_generation_prompt=False, tokenize=True)))
     formatted_text = processor.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
     text_prompts.append(formatted_text)
-    count += 1
 print()
 
 inputs = processor(text=text_prompts, audio=audios, return_tensors="pt", padding=True)
