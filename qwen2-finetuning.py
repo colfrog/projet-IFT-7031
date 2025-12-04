@@ -8,7 +8,6 @@ from transformers import (
     Trainer,
     TrainingArguments
 )
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 import os
 
 MODEL_ID = "Qwen/Qwen2-Audio-7B-Instruct"
@@ -26,22 +25,6 @@ model = Qwen2AudioForConditionalGeneration.from_pretrained(
     device_map="auto"
 )
 
-# Prepare model for LoRA
-model = prepare_model_for_kbit_training(model)
-
-# Define LoRA Config
-peft_config = LoraConfig(
-    r=64, # Rank
-    lora_alpha=16,
-    target_modules="all_linear",
-    lora_dropout=0.05,
-    bias="none",
-    task_type="CAUSAL_LM"
-)
-
-model = get_peft_model(model, peft_config)
-model.print_trainable_parameters()
-
 def load_data(json_file):
     with open(json_file, 'r') as f:
         data = json.load(f)
@@ -54,7 +37,7 @@ print("Processing dataset...")
 audios = []
 count = 0
 for sample in raw_data:
-    print(f"\r{count}/{len(raw_data)}")
+    print(f"\r{count}/{len(raw_data)}", end="")
     audio, _ = librosa.load(sample.pop('audio'), sr=processor.feature_extractor.sampling_rate)
     audios.append(audio)
     count += 1
@@ -73,7 +56,6 @@ training_args = TrainingArguments(
     learning_rate=1e-4,
     num_train_epochs=1,
     logging_steps=10,
-    fp16=True,
     save_strategy="epoch",
     save_total_limit=1,
     report_to="none",
