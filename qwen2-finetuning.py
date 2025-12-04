@@ -12,14 +12,17 @@ from transformers import (
     BitsAndBytesConfig
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+import os
 
 MODEL_ID = "Qwen/Qwen2-Audio-7B-Instruct"
 DATA_FILE = "train_data.json"
 OUTPUT_DIR = "./qwen2-audio-finetuned"
+MODEL_PATH = os.path.abspath("/home/lcimon/scratch/hub/models--Qwen--Qwen2-Audio-7B-Instruct/snapshots/0a095220c30b7b31434169c3086508ef3ea5bf0a/")
 
-print("Loading model and processor...")
+print("Loading model and processor... ", end="")
+print(f"({MODEL_PATH})" if os.path.exists(MODEL_PATH) else f"({MODEL_ID})")
 
-processor = AutoProcessor.from_pretrained(MODEL_ID)
+processor = AutoProcessor.from_pretrained(MODEL_PATH if os.path.exists(MODEL_PATH) else MODEL_ID)
 
 bnb_config = BitsAndBytesConfig(
     load_in_4bit=True,
@@ -29,10 +32,11 @@ bnb_config = BitsAndBytesConfig(
 )
 
 model = Qwen2AudioForConditionalGeneration.from_pretrained(
-    MODEL_ID,
+    MODEL_PATH if os.path.exists(MODEL_PATH) else MODEL_ID,
     quantization_config=bnb_config,
     device_map="auto",
-    attn_implementation="flash_attention_2" # Use "eager" if flash attn not installed
+    attn_implementation="flash_attention_2", # Use "eager" if flash attn not installed
+    download=False
 )
 
 # Prepare model for LoRA
