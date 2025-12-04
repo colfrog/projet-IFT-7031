@@ -64,16 +64,43 @@ raw_data = load_data(DATA_FILE)
 
 print("Processing dataset...")
 audios = []
+text_prompts = []
+instruction_lens = []
 count = 0
-for sample in raw_data:
+for sample in enumerate(raw_data):
     print(f"\r{count}/{len(raw_data)}", end="")
     audio, _ = librosa.load(sample['audio'], sr=processor.feature_extractor.sampling_rate)
     audios.append(audio)
+
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "audio", "audio_url": sample['audio']},
+                {"type": "text", "text": sample['instruction']}
+            ]
+        },
+        {
+            "role": "assistant",
+            "content": sample['output']
+        }
+    ]
+
+    instruction_lens.append(len(processor.apply_chat_template([messages[0]], add_generation_prompt=False, tokenize=True)))
+    formatted_text = processor.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
+    text_prompts.append(formatted_text)
     count += 1
 print()
 
-text = processor.apply_chat_template(raw_data, add_generation_prompt=True, tokenize=False)
-inputs = processor(text=text, audio=audios, return_tensors="pt", padding=True)
+inputs = processor(text=text_prompts, audio=audios, return_tensors="pt", padding=True)
+inputs["labels"] = inputs["input_ids"].clone()
+padding_mask = inputs["input_ids"] == processor.tokenizer.pad_token_id
+inputs["labels"][padding_mask] = -100
+
+# Ignore the user input to avoid learning it.
+for i, prompt_len in enumerate(instruction_lens):
+    inputs["labels"][i, :prompt_len] = -100
+
 dataset = Dataset.from_dict(inputs)
 
 # --- 4. Training Arguments ---
