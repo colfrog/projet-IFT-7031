@@ -10,12 +10,15 @@ from transformers import (
     BitsAndBytesConfig
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from miditok import REMI, TokenizerConfig
 import os
 
 MODEL_ID = "Qwen/Qwen2-Audio-7B-Instruct"
-DATA_FILE = "train_data.json"
 OUTPUT_DIR = "./qwen2-audio-finetuned"
 MODEL_PATH = os.path.abspath("/home/lcimon/scratch/hub/models--Qwen--Qwen2-Audio-7B-Instruct/snapshots/0a095220c30b7b31434169c3086508ef3ea5bf0a/")
+DATA_PATH = os.path.abspath("/home/lcimon/scratch/training_data")
+MIDI_PATHS = DATA_PATH.glob("**/*.mid")
+SAMPLE_PATHS = DATA_PATH.glob("*/*")
 
 print(f"CUDA Version: {torch.version.cuda}")
 
@@ -30,6 +33,7 @@ bnb_config = BitsAndBytesConfig(
 )
 
 processor = AutoProcessor.from_pretrained(MODEL_PATH if os.path.exists(MODEL_PATH) else MODEL_ID)
+print(f"Sampling rate: {processor.feature_extractor.sampling_rate}")
 
 model = Qwen2AudioForConditionalGeneration.from_pretrained(
     MODEL_PATH if os.path.exists(MODEL_PATH) else MODEL_ID,
@@ -59,34 +63,54 @@ def load_data(json_file):
         data = json.load(f)
     return data
 
-print("Loading dataset...")
-raw_data = load_data(DATA_FILE)[:20]
+class RemiCompactor():
+    def __init__(self):
+        remi_config = TokenizerConfig(num_velocities=16, use_chords=True, use_tempos=True, beat_res={(0, 4): 8, (4, 12): 4})
+        self.remi = REMI(remi_config)
+        self.remi.train(vocab_size=30000, files_paths=MIDI_PATHS)
+
+    def midi_to_str(self, path):
+        try:
+            tokens = self.remi.encode(path)
+            self.remi.complete_sequence(tokens)
+            return " ".join(tokens.tokens)
+        except Exception as e:
+            print(f"Error converting {midi_path}: {e}")
+            return ""
 
 print("Processing dataset...")
 audios = []
 text_prompts = []
 instruction_lens = []
-for count, sample in enumerate(raw_data):
-    print(f"\r{count}/{len(raw_data)}", end="")
-    audio, _ = librosa.load(sample['audio'], sr=processor.feature_extractor.sampling_rate)
+midi_compactor = RemiCompactor()
+for count, path in enumerate(SAMPLE_PATHS):
+    print(f"\r{count}/{len(MIDI_PATHS)}", end="")
+
+    audio_path = f"${path}/audio.wav"
+    midi_path = f"${path}/plain.mid"
+    mpe_path = f"${path}/mpe.mid"
+
+    audio, _ = librosa.load(audio_path, sr=processor.feature_extractor.sampling_rate, mono=True)
     audios.append(audio)
 
     messages = [
         {
             "role": "user",
             "content": [
-                {"type": "audio", "audio_url": sample['audio']},
-                {"type": "text", "text": sample['instruction']}
+                {"type": "audio", "audio_url": audio_path},
+                {"type": "text", "text": midi_compactor.midi_to_str(midi_path)}
             ]
         },
         {
             "role": "assistant",
-            "content": sample['output']
+            "content": midi_compactor.midi_to_str(mpe_path)
         }
     ]
 
     instruction_lens.append(len(processor.apply_chat_template([messages[0]], add_generation_prompt=False, tokenize=True)))
     formatted_text = processor.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
+    if count == 1:
+        print(formatted_text)
     text_prompts.append(formatted_text)
 print()
 
