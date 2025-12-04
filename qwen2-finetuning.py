@@ -33,8 +33,7 @@ model = Qwen2AudioForConditionalGeneration.from_pretrained(
     MODEL_PATH if os.path.exists(MODEL_PATH) else MODEL_ID,
     quantization_config=bnb_config,
     device_map="auto",
-    attn_implementation="flash_attention_2", # Use "eager" if flash attn not installed
-    download=False
+    attn_implementation="flash_attention_2" # Use "eager" if flash attn not installed
 )
 
 # Prepare model for LoRA
