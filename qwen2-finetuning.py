@@ -60,7 +60,7 @@ def load_data(json_file):
     return data
 
 print("Loading dataset...")
-raw_data = load_data(DATA_FILE)
+raw_data = load_data(DATA_FILE)[:20]
 
 print("Processing dataset...")
 audios = []
@@ -90,16 +90,23 @@ for count, sample in enumerate(raw_data):
     text_prompts.append(formatted_text)
 print()
 
-inputs = processor(text=text_prompts, audio=audios, return_tensors="pt", padding=True)
-inputs["labels"] = inputs["input_ids"].clone()
-padding_mask = inputs["input_ids"] == processor.tokenizer.pad_token_id
-inputs["labels"][padding_mask] = -100
+def data_collator(features):
+    text = [f["text"] for f in features]
+    audio = [f["audio"] for f in features]
+    lens = [f["instruction_len"] for f in features]
 
-# Ignore the user input to avoid learning it.
-for i, prompt_len in enumerate(instruction_lens):
-    inputs["labels"][i, :prompt_len] = -100
+    inputs = processor(text=text, audio=audio, return_tensors="pt", padding=True, sampling_rate=processor.feature_extractor.sampling_rate)
+    inputs["labels"] = inputs["input_ids"].clone()
+    padding_mask = inputs["input_ids"] == processor.tokenizer.pad_token_id
+    inputs["labels"][padding_mask] = -100
 
-dataset = Dataset.from_dict(inputs)
+    # Ignore the user input to avoid learning it.
+    for i, prompt_len in enumerate(lens):
+        inputs["labels"][i, :prompt_len] = -100
+
+    return inputs
+
+dataset = Dataset.from_dict({"text": text_prompts, "audio": audios, "instruction_len": instruction_lens})
 
 # --- 4. Training Arguments ---
 
@@ -124,6 +131,7 @@ trainer = Trainer(
     args=training_args,
     train_dataset=dataset,
     tokenizer=processor.tokenizer,
+    data_collator=data_collator
 )
 
 # --- 6. Train ---
