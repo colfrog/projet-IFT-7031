@@ -11,14 +11,17 @@ from transformers import (
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from miditok import REMI, TokenizerConfig
+import py_midicsv as pm
 import os
+from pathlib import Path
 
 MODEL_ID = "Qwen/Qwen2-Audio-7B-Instruct"
 OUTPUT_DIR = "./qwen2-audio-finetuned"
-MODEL_PATH = os.path.abspath("/home/lcimon/scratch/hub/models--Qwen--Qwen2-Audio-7B-Instruct/snapshots/0a095220c30b7b31434169c3086508ef3ea5bf0a/")
-DATA_PATH = os.path.abspath("/home/lcimon/scratch/training_data")
+MODEL_PATH = Path("/home/lcimon/scratch/hub/models--Qwen--Qwen2-Audio-7B-Instruct/snapshots/0a095220c30b7b31434169c3086508ef3ea5bf0a/")
+DATA_PATH = Path("/home/lcimon/scratch/training_data")
 MIDI_PATHS = DATA_PATH.glob("**/*.mid")
 SAMPLE_PATHS = DATA_PATH.glob("*/*")
+MAX_SIZE = 8192
 
 print(f"CUDA Version: {torch.version.cuda}")
 
@@ -39,7 +42,7 @@ model = Qwen2AudioForConditionalGeneration.from_pretrained(
     MODEL_PATH if os.path.exists(MODEL_PATH) else MODEL_ID,
     device_map="auto",
     quantization_config=bnb_config,
-    attn_implementation="flash_attention_2"
+    attn_implementation="eager"
 )
 
 # Prepare model for LoRA
@@ -65,30 +68,33 @@ def load_data(json_file):
 
 class RemiCompactor():
     def __init__(self):
-        remi_config = TokenizerConfig(num_velocities=16, use_chords=True, use_tempos=True, beat_res={(0, 4): 8, (4, 12): 4})
+        remi_config = TokenizerConfig(num_velocities=16, use_chords=True, use_tempos=True, use_programs=True, one_token_stream_for_programs=True, use_time_signatures=True, ac_polyphony_track=True)
         self.remi = REMI(remi_config)
-        self.remi.train(vocab_size=30000, files_paths=MIDI_PATHS)
+        # self.remi.train(vocab_size=30000, files_paths=list(MIDI_PATHS))
 
     def midi_to_str(self, path):
-        try:
-            tokens = self.remi.encode(path)
-            self.remi.complete_sequence(tokens)
-            return " ".join(tokens.tokens)
-        except Exception as e:
-            print(f"Error converting {midi_path}: {e}")
-            return ""
+        tokens = self.remi.encode(path)
+        if isinstance(tokens, list):
+            tokens = tokens[0]
+
+        self.remi.complete_sequence(tokens)
+        return " ".join(tokens.tokens)
 
 print("Processing dataset...")
 audios = []
 text_prompts = []
 instruction_lens = []
 midi_compactor = RemiCompactor()
-for count, path in enumerate(SAMPLE_PATHS):
-    print(f"\r{count}/{len(MIDI_PATHS)}", end="")
+paths = list(SAMPLE_PATHS)
+for count, path in enumerate(paths):
+    print(f"\r{count}/{len(paths)}", end="")
 
-    audio_path = f"${path}/audio.wav"
-    midi_path = f"${path}/plain.mid"
-    mpe_path = f"${path}/mpe.mid"
+    audio_path = f"{path}/audio.wav"
+    midi_path = f"{path}/plain.mid"
+    mpe_path = f"{path}/mpe.mid"
+
+    midi_csv = ''.join(pm.midi_to_csv(midi_path))
+    mpe_csv = ''.join(pm.midi_to_csv(mpe_path))
 
     audio, _ = librosa.load(audio_path, sr=processor.feature_extractor.sampling_rate, mono=True)
     audios.append(audio)
@@ -98,20 +104,20 @@ for count, path in enumerate(SAMPLE_PATHS):
             "role": "user",
             "content": [
                 {"type": "audio", "audio_url": audio_path},
-                {"type": "text", "text": midi_compactor.midi_to_str(midi_path)}
+                {"type": "text", "text": f"Convert the following to MPE according to the audio\n\n{midi_csv}"}
             ]
         },
         {
             "role": "assistant",
-            "content": midi_compactor.midi_to_str(mpe_path)
+            "content": mpe_csv
         }
     ]
 
     instruction_lens.append(len(processor.apply_chat_template([messages[0]], add_generation_prompt=False, tokenize=True)))
     formatted_text = processor.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
-    if count == 1:
-        print(formatted_text)
     text_prompts.append(formatted_text)
+
+    print(f"\r{count}/{len(paths)}", end="")
 print()
 
 def data_collator(features):
@@ -122,6 +128,7 @@ def data_collator(features):
     inputs = processor(text=text, audio=audio, return_tensors="pt", padding=True, sampling_rate=processor.feature_extractor.sampling_rate)
     inputs["labels"] = inputs["input_ids"].clone()
     padding_mask = inputs["input_ids"] == processor.tokenizer.pad_token_id
+    inputs["attention_mask"] = padding_mask == False
     inputs["labels"][padding_mask] = -100
 
     # Ignore the user input to avoid learning it.
