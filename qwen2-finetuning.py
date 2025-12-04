@@ -43,7 +43,7 @@ for sample in raw_data:
     count += 1
 print()
 
-text = processor.apply_chat_templates(raw_data, add_generation_prompt=True, tokenize=False)
+text = processor.apply_chat_template(raw_data, add_generation_prompt=True, tokenize=False)
 inputs = processor(text=text, audios=audios, return_tensors="pt", padding=True)
 dataset = Dataset.from_dict(inputs)
 
