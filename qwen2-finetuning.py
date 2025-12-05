@@ -11,7 +11,7 @@ from transformers import (
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from miditok import REMI, TokenizerConfig
-import py_midicsv as pm
+import mido
 import os
 from pathlib import Path
 
@@ -68,11 +68,53 @@ def load_data(json_file):
 
 class RemiCompactor():
     def __init__(self):
-        remi_config = TokenizerConfig(num_velocities=16, use_chords=True, use_tempos=True, use_programs=True, one_token_stream_for_programs=True, use_time_signatures=True, ac_polyphony_track=True)
+        remi_config = TokenizerConfig(
+            num_velocities=16,
+            use_pitch_bends=True,
+            use_control_changes=True,
+            use_programs=True,
+            one_token_stream_for_programs=False,
+            use_time_signatures=True,
+            ac_polyphony_track=True
+        )
         self.remi = REMI(remi_config)
-        # self.remi.train(vocab_size=30000, files_paths=list(MIDI_PATHS))
+        self.remi.train(vocab_size=30000, files_paths=list(MIDI_PATHS))
 
-    def midi_to_str(self, path):
+    def explode_mpe_to_tracks(input_midi_path, output_midi_path):
+        """
+        Splits an MPE MIDI file (usually Type 0 or 1 merged) into
+        separate tracks for each Channel (1-16).
+        This forces the Tokenizer to treat them as separate 'Voices'.
+        """
+        mid = mido.MidiFile(input_midi_path)
+        new_mid = mido.MidiFile()
+        new_mid.ticks_per_beat = mid.ticks_per_beat
+
+        # Create 17 empty tracks (0=Global, 1-16=Channels)
+        channels = [mido.MidiTrack() for _ in range(17)]
+
+        # Sort every message into its corresponding track based on channel
+        for track in mid.tracks:
+            for msg in track:
+                if hasattr(msg, 'channel'):
+                    # Channels are 0-15 in mido, mapped to tracks 1-16
+                    channels[msg.channel + 1].append(msg)
+                else:
+                    # Meta messages (Tempo, Time Sig) go to Track 0 (Global)
+                    channels[0].append(msg)
+
+        # Add non-empty tracks to the new file
+        for track in channels:
+            if len(track) > 0:
+                new_mid.tracks.append(track)
+
+        new_mid.save(output_midi_path)
+        print(f"Exploded MPE file to {len(new_mid.tracks)} tracks.")
+
+    def midi_to_str(self, path, mpe=False):
+        if mpe:
+            self.explode_mpe_to_tracks(path, "/tmp/exploded.mid")
+            path = "/tmp/exploded.mid"
         tokens = self.remi.encode(path)
         if isinstance(tokens, list):
             tokens = tokens[0]
@@ -93,8 +135,8 @@ for count, path in enumerate(paths):
     midi_path = f"{path}/plain.mid"
     mpe_path = f"{path}/mpe.mid"
 
-    midi_csv = ''.join(pm.midi_to_csv(midi_path))
-    mpe_csv = ''.join(pm.midi_to_csv(mpe_path))
+    tokenized_midi = midi_compactor.midi_to_str(midi_path)
+    tokenized_mpe = midi_compactor.midi_to_str(mpe_path, mpe=True)
 
     audio, _ = librosa.load(audio_path, sr=processor.feature_extractor.sampling_rate, mono=True)
     audios.append(audio)
@@ -104,12 +146,12 @@ for count, path in enumerate(paths):
             "role": "user",
             "content": [
                 {"type": "audio", "audio_url": audio_path},
-                {"type": "text", "text": f"Convert the following to MPE according to the audio\n\n{midi_csv}"}
+                {"type": "text", "text": f"Convert the following to MPE according to the audio\n\n{tokenized_midi}"}
             ]
         },
         {
             "role": "assistant",
-            "content": mpe_csv
+            "content": tokenized_mpe
         }
     ]
 
@@ -146,7 +188,7 @@ training_args = TrainingArguments(
     per_device_train_batch_size=1,
     gradient_accumulation_steps=8,
     learning_rate=1e-4,
-    num_train_epochs=1,
+    num_train_epochs=3,
     logging_steps=10,
     fp16=True,
     save_strategy="epoch",
