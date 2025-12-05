@@ -80,7 +80,7 @@ class RemiCompactor():
         self.remi = REMI(remi_config)
         self.remi.train(vocab_size=30000, files_paths=list(MIDI_PATHS))
 
-    def explode_mpe_to_tracks(input_midi_path, output_midi_path):
+    def explode_mpe_to_tracks(self, input_midi_path, output_midi_path):
         """
         Splits an MPE MIDI file (usually Type 0 or 1 merged) into
         separate tracks for each Channel (1-16).
@@ -109,7 +109,7 @@ class RemiCompactor():
                 new_mid.tracks.append(track)
 
         new_mid.save(output_midi_path)
-        print(f"Exploded MPE file to {len(new_mid.tracks)} tracks.")
+        #print(f"Exploded MPE file to {len(new_mid.tracks)} tracks.")
 
     def midi_to_str(self, path, mpe=False):
         if mpe:
