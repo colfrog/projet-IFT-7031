@@ -16,7 +16,7 @@ import os
 from pathlib import Path
 
 MODEL_ID = "Qwen/Qwen2-Audio-7B-Instruct"
-OUTPUT_DIR = "./qwen2-audio-finetuned"
+OUTPUT_DIR = "./qwen2-audio-finetuned-v2"
 MODEL_PATH = Path("/home/lcimon/scratch/hub/models--Qwen--Qwen2-Audio-7B-Instruct/snapshots/0a095220c30b7b31434169c3086508ef3ea5bf0a/")
 DATA_PATH = Path("/home/lcimon/scratch/training_data")
 MIDI_PATHS = DATA_PATH.glob("**/*.mid")
@@ -143,6 +143,15 @@ for count, path in enumerate(paths):
 
     messages = [
         {
+            "role": "system",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "You are a helpful assistant."
+                }
+            ]
+        },
+        {
             "role": "user",
             "content": [
                 {"type": "audio", "audio_url": audio_path},
@@ -151,7 +160,12 @@ for count, path in enumerate(paths):
         },
         {
             "role": "assistant",
-            "content": tokenized_mpe
+            "content": [
+                {
+                    "type": "text",
+                    "text": tokenized_mpe
+                }
+            ]
         }
     ]
 

@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 
 MODEL_ID = "Qwen/Qwen2-Audio-7B-Instruct"
-OUTPUT_DIR = "./qwen2-audio-finetuned"
+OUTPUT_DIR = "./qwen2-audio-finetuned-v2"
 ADAPTER_PATH = OUTPUT_DIR
 MODEL_PATH = Path("/home/lcimon/scratch/hub/models--Qwen--Qwen2-Audio-7B-Instruct/snapshots/0a095220c30b7b31434169c3086508ef3ea5bf0a/")
 DATA_PATH = Path("/home/lcimon/scratch/training_data")
@@ -38,13 +38,12 @@ processor = AutoProcessor.from_pretrained(MODEL_PATH if os.path.exists(MODEL_PAT
 print(f"Sampling rate: {processor.feature_extractor.sampling_rate}")
 
 model = Qwen2AudioForConditionalGeneration.from_pretrained(
-    MODEL_PATH if os.path.exists(MODEL_PATH) else MODEL_ID,
+    #MODEL_PATH if os.path.exists(MODEL_PATH) else MODEL_ID,
+    ADAPTER_PATH,
     device_map="auto",
     quantization_config=bnb_config,
     attn_implementation="eager"
 )
-
-model = PeftModel.from_pretrained(model, ADAPTER_PATH)
 
 class RemiCompactor():
     def __init__(self):
@@ -104,8 +103,8 @@ class RemiCompactor():
 
 print("Processing dataset...")
 midi_compactor = RemiCompactor()
-audio_path = "output/other.wav"
-midi_path = "output/other.mid"
+audio_path = "/home/lcimon/scratch/training_data/guitar/sample_0000/audio.wav"
+midi_path = "/home/lcimon/scratch/training_data/guitar/sample_0000/plain.mid"
 
 tokenized_midi = midi_compactor.midi_to_str(midi_path)
 
@@ -120,12 +119,11 @@ messages = [
     }
 ]
 
-formatted_text = processor.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
+formatted_text = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
 inputs = processor(text=formatted_text, audio=audio, return_tensors="pt", padding=True, sampling_rate=processor.feature_extractor.sampling_rate)
-inputs.input_ids = inputs.input_ids.cuda()
+for key in inputs:
+    inputs[key] = inputs[key].cuda()
 
 generate_ids = model.generate(**inputs, max_length=MAX_LENGTH)
-generate_ids = generate_ids[:, inputs.input_ids.size(1):]
-
 response = processor.batch_decode(generate_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)[0]
 print(response)
