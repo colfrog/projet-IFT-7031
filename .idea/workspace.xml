@@ -5,9 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9ee95e9e-2216-4000-82c2-82c605758160" name="Changes" comment="Modify the script">
-      <change afterPath="$PROJECT_DIR$/remi.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/output_remi.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/qwen2-finetuning.py" beforeDir="false" afterPath="$PROJECT_DIR$/qwen2-finetuning.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/remi.py" beforeDir="false" afterPath="$PROJECT_DIR$/remi.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -88,6 +88,8 @@
       <workItem from="1763573069013" duration="978000" />
       <workItem from="1764791960738" duration="4956000" />
       <workItem from="1764894083217" duration="1187000" />
+      <workItem from="1764907378458" duration="3513000" />
+      <workItem from="1764953847546" duration="1453000" />
     </task>
     <task id="LOCAL-00001" summary="Commencer le projet avec DEMUCS en suivant le tutoriel pytorch">
       <option name="closed" value="true" />
@@ -131,6 +133,6 @@
     <SUITE FILE_PATH="coverage/projet_IFT_7031$basic_pitch.coverage" NAME="basic-pitch Coverage Results" MODIFIED="1762874076152" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/projet_IFT_7031$qwen2_finetuning.coverage" NAME="qwen2-finetuning Coverage Results" MODIFIED="1764797410648" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/projet_IFT_7031$make_json.coverage" NAME="make_json Coverage Results" MODIFIED="1764795151893" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/projet_IFT_7031$remi.coverage" NAME="remi Coverage Results" MODIFIED="1764895053410" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/projet_IFT_7031$remi.coverage" NAME="remi Coverage Results" MODIFIED="1764909666007" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>

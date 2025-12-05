@@ -1,4 +1,4 @@
-from miditok import REMI, TokenizerConfig
+from miditok import REMI, TokenizerConfig, TokSequence
 from pathlib import Path
 import mido
 
@@ -50,6 +50,7 @@ class RemiCompactor():
             ac_polyphony_track=True
         )
         self.remi = REMI(remi_config)
+        self.remi.train(vocab_size=30000, files_paths=list(MIDI_PATHS))
 
     def midi_to_str(self, path, mpe=False):
         if mpe:
@@ -62,9 +63,35 @@ class RemiCompactor():
         self.remi.complete_sequence(tokens)
         return " ".join(tokens.tokens)
 
+    def str_to_midi(self, output, output_path="output/mpe.mid"):
+        # 1. Split string into individual token strings
+        token_strings = output.strip().split(' ')
+
+        # 2. Convert String Tokens -> Integer IDs
+        # We need to look up the ID for each token string in the vocab
+        token_ids = []
+        for t in token_strings:
+            if t in self.remi.vocab:
+                token_ids.append(self.remi.vocab[t])
+            else:
+                print(f"Warning: Skipping unknown token '{t}'")
+
+        # 3. Create a TokSequence
+        # MidiTok v3 requires a TokSequence object for decoding
+        seq = TokSequence(ids=token_ids)
+
+        # 4. Decode (IDs -> MIDI)
+        # If BPE was used, this automatically handles the BPE decoding
+        midi = self.remi.decode([seq])
+
+        # 5. Save
+        midi.dump_midi(output_path)
+        print(f"Successfully saved MIDI to {output_path}")
+
 remi = RemiCompactor()
 mpe = remi.midi_to_str("training_data/guitar/sample_0000/mpe.mid", mpe=True)
 midi = remi.midi_to_str("training_data/guitar/sample_0000/plain.mid")
+remi.str_to_midi(mpe, output_path="test.mid")
 
 print(midi)
 print(mpe)
