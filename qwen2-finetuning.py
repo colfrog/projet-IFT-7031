@@ -260,6 +260,7 @@ def data_collator(features):
     return inputs
 
 dataset = Dataset.from_dict({"text": text_prompts, "audio": audios, "instruction_len": instruction_lens})
+train_dataset, eval_dataset = torch.utils.data.random_split(dataset, [int(len(dataset) * 0.9), len(dataset) - int(len(dataset) * 0.9)])
 
 def compute_metrics(pred):
     labels = pred.label_ids
@@ -285,7 +286,8 @@ training_args = TrainingArguments(
 trainer = Trainer(
     model=model,
     args=training_args,
-    train_dataset=dataset,
+    train_dataset=train_dataset,
+    eval_dataset=eval_dataset,
     tokenizer=processor.tokenizer,
     data_collator=data_collator,
     compute_metrics=compute_metrics
