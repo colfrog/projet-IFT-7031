@@ -12,6 +12,7 @@ from transformers import (
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from miditok import REMI, TokenizerConfig
+from sklearn.metrics import recall_score, precision_score
 import mido
 import os
 from pathlib import Path
@@ -232,6 +233,7 @@ for count, path in enumerate(paths):
     print(f"\rProcessing MPE samples... {count}/{len(paths)}", end="")
 print()
 
+# We may add more later
 augments = [
     RandomApply(PolarityInversion(), p=0.5),
     RandomApply(Noise(min_snr=0.1, max_snr=0.5), p=0.6),
@@ -259,6 +261,13 @@ def data_collator(features):
 
 dataset = Dataset.from_dict({"text": text_prompts, "audio": audios, "instruction_len": instruction_lens})
 
+def compute_metrics(pred):
+    labels = pred.label_ids
+    preds = pred.predictions.argmax(-1)
+    precision = precision_score(labels, preds, average="macro")
+    recall = recall_score(labels, preds, average="macro")
+    return {"precision": precision, "recall": recall}
+
 training_args = TrainingArguments(
     output_dir=OUTPUT_DIR,
     per_device_train_batch_size=1,
@@ -278,7 +287,8 @@ trainer = Trainer(
     args=training_args,
     train_dataset=dataset,
     tokenizer=processor.tokenizer,
-    data_collator=data_collator
+    data_collator=data_collator,
+    compute_metrics=compute_metrics
 )
 
 print("Starting training...")
