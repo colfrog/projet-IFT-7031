@@ -1,7 +1,7 @@
 import torch
 import json
 import torchaudio
-from torchaudio_augmentations import Compose, RandomApply, PolarityInversion, Noise, Gain, Reverb
+from torchaudio_augmentations import Compose, RandomApply, PolarityInversion, Noise, Gain
 from datasets import Dataset
 from transformers import (
     Qwen2AudioForConditionalGeneration,
@@ -18,7 +18,7 @@ import os
 from pathlib import Path
 
 import kagglehub
-MUSICNET_PATH = "placeholder"
+MUSICNET_PATH = "/home/lcimon/scratch/kaggle/datasets/imsparsh/musicnet-dataset/versions/1"
 if not os.path.exists(MUSICNET_PATH):
     MUSICNET_PATH = kagglehub.dataset_download("imsparsh/musicnet-dataset")
     print(f"MusicNet: {MUSICNET_PATH}")
@@ -26,7 +26,7 @@ MUSICNET_PATH = Path(MUSICNET_PATH)
 MUSICNET_AUDIO_PATHS = list(MUSICNET_PATH.joinpath("musicnet/musicnet/train_data").glob("*.wav"))
 MUSICNET_MIDI_PATHS = []
 for audio_path in MUSICNET_AUDIO_PATHS:
-    glob = MUSICNET_PATH.joinpath("musicnet_midis/musicnet_midis").glob(f"*/{audio_path.stem}.mid")
+    glob = MUSICNET_PATH.joinpath("musicnet_midis/musicnet_midis").glob(f"*/{audio_path.stem}*.mid")
     for midi_path in glob:
         MUSICNET_MIDI_PATHS.append(midi_path)
 
@@ -37,8 +37,8 @@ OUTPUT_DIR = "./qwen2-audio-finetuned-v3"
 REMI_PATH = "remi.json"
 MODEL_PATH = Path("/home/lcimon/scratch/hub/models--Qwen--Qwen2-Audio-7B-Instruct/snapshots/0a095220c30b7b31434169c3086508ef3ea5bf0a/")
 DATA_PATH = Path("/home/lcimon/scratch/training_data")
-MIDI_PATHS = DATA_PATH.glob("**/*.mid")
-SAMPLE_PATHS = DATA_PATH.glob("*/*")
+MIDI_PATHS = list(DATA_PATH.glob("**/*.mid"))
+SAMPLE_PATHS = list(DATA_PATH.glob("*/*"))
 MAX_SIZE = 8192
 
 print(f"CUDA Version: {torch.version.cuda}")
@@ -87,6 +87,7 @@ class RemiCompactor():
             remi_config = TokenizerConfig(
                 num_velocities=16,
                 use_pitch_bends=True,
+                pitch_bend_range=(-8192, 8191, 1024), # We need a lot of values for pitch bends
                 use_control_changes=True,
                 use_programs=True,
                 one_token_stream_for_programs=False,
@@ -94,7 +95,7 @@ class RemiCompactor():
                 ac_polyphony_track=True
             )
             self.remi = REMI(remi_config)
-            self.remi.train(vocab_size=30000, files_paths=list(MIDI_PATHS))
+            self.remi.train(vocab_size=30000, files_paths=MIDI_PATHS + MUSICNET_MIDI_PATHS)
             self.remi.save(REMI_PATH)
 
     def explode_mpe_to_tracks(self, input_midi_path, output_midi_path):
@@ -232,6 +233,17 @@ for count, path in enumerate(paths):
     text_prompts.append(formatted_text)
     print(f"\rProcessing MPE samples... {count}/{len(paths)}", end="")
 print()
+
+# Make our own Reverb module based on the pytorch data augmentation tutorial
+class Reverb(torch.nn.Module):
+    def __init__(self, sr):
+        super(Reverb, self).__init__()
+        self.sr = sr
+
+    def forward(self, audio):
+        audio = audio[:, int(self.sr*1.01):int(self.sr*1.3)]
+        audio = audio/torch.linalg.vector_norm(audio, ord=2)
+        return audio
 
 # We may add more later
 augments = [

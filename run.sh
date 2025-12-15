@@ -14,6 +14,7 @@ scontrol show job=$SLURM_JOB_ID
 source ~/.bashrc
 source .venv/bin/activate
 export HF_HOME=/home/lcimon/scratch
+export KAGGLEHUB_CACHE=/home/lcimon/scratch/kaggle
 
 python qwen2-finetuning.py
 

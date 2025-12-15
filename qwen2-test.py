@@ -50,6 +50,7 @@ class RemiCompactor():
         remi_config = TokenizerConfig(
             num_velocities=16,
             use_pitch_bends=True,
+            pitch_bend_range=(-8192, 8191, 1024), # We need a lot of values for pitch bends
             use_control_changes=True,
             use_programs=True,
             one_token_stream_for_programs=False,
