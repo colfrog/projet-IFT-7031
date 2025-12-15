@@ -1,6 +1,7 @@
 import torch
 import json
-import librosa
+import torchaudio
+from torchaudio_augmentations import Compose, RandomApply, PolarityInversion, Noise, Gain, Reverb
 from datasets import Dataset
 from transformers import (
     Qwen2AudioForConditionalGeneration,
@@ -15,8 +16,24 @@ import mido
 import os
 from pathlib import Path
 
+import kagglehub
+MUSICNET_PATH = "placeholder"
+if not os.path.exists(MUSICNET_PATH):
+    MUSICNET_PATH = kagglehub.dataset_download("imsparsh/musicnet-dataset")
+    print(f"MusicNet: {MUSICNET_PATH}")
+MUSICNET_PATH = Path(MUSICNET_PATH)
+MUSICNET_AUDIO_PATHS = list(MUSICNET_PATH.joinpath("musicnet/musicnet/train_data").glob("*.wav"))
+MUSICNET_MIDI_PATHS = []
+for audio_path in MUSICNET_AUDIO_PATHS:
+    glob = MUSICNET_PATH.joinpath("musicnet_midis/musicnet_midis").glob(f"*/{audio_path.stem}.mid")
+    for midi_path in glob:
+        MUSICNET_MIDI_PATHS.append(midi_path)
+
+assert len(MUSICNET_AUDIO_PATHS) == len(MUSICNET_MIDI_PATHS)
+
 MODEL_ID = "Qwen/Qwen2-Audio-7B-Instruct"
-OUTPUT_DIR = "./qwen2-audio-finetuned-v2"
+OUTPUT_DIR = "./qwen2-audio-finetuned-v3"
+REMI_PATH = "remi.json"
 MODEL_PATH = Path("/home/lcimon/scratch/hub/models--Qwen--Qwen2-Audio-7B-Instruct/snapshots/0a095220c30b7b31434169c3086508ef3ea5bf0a/")
 DATA_PATH = Path("/home/lcimon/scratch/training_data")
 MIDI_PATHS = DATA_PATH.glob("**/*.mid")
@@ -61,24 +78,23 @@ peft_config = LoraConfig(
 model = get_peft_model(model, peft_config)
 model.print_trainable_parameters()
 
-def load_data(json_file):
-    with open(json_file, 'r') as f:
-        data = json.load(f)
-    return data
-
 class RemiCompactor():
     def __init__(self):
-        remi_config = TokenizerConfig(
-            num_velocities=16,
-            use_pitch_bends=True,
-            use_control_changes=True,
-            use_programs=True,
-            one_token_stream_for_programs=False,
-            use_time_signatures=True,
-            ac_polyphony_track=True
-        )
-        self.remi = REMI(remi_config)
-        self.remi.train(vocab_size=30000, files_paths=list(MIDI_PATHS))
+        if os.path.exists(REMI_PATH):
+            self.remi = REMI(params=Path(REMI_PATH))
+        else:
+            remi_config = TokenizerConfig(
+                num_velocities=16,
+                use_pitch_bends=True,
+                use_control_changes=True,
+                use_programs=True,
+                one_token_stream_for_programs=False,
+                use_time_signatures=True,
+                ac_polyphony_track=True
+            )
+            self.remi = REMI(remi_config)
+            self.remi.train(vocab_size=30000, files_paths=list(MIDI_PATHS))
+            self.remi.save(REMI_PATH)
 
     def explode_mpe_to_tracks(self, input_midi_path, output_midi_path):
         """
@@ -127,18 +143,12 @@ audios = []
 text_prompts = []
 instruction_lens = []
 midi_compactor = RemiCompactor()
-paths = list(SAMPLE_PATHS)
-for count, path in enumerate(paths):
-    print(f"\r{count}/{len(paths)}", end="")
-
-    audio_path = f"{path}/audio.wav"
-    midi_path = f"{path}/plain.mid"
-    mpe_path = f"{path}/mpe.mid"
-
+for i in range(len(MUSICNET_AUDIO_PATHS)):
+    audio_path = MUSICNET_AUDIO_PATHS[i]
+    midi_path = MUSICNET_MIDI_PATHS[i]
     tokenized_midi = midi_compactor.midi_to_str(midi_path)
-    tokenized_mpe = midi_compactor.midi_to_str(mpe_path, mpe=True)
-
-    audio, _ = librosa.load(audio_path, sr=processor.feature_extractor.sampling_rate, mono=True)
+    audio, sr = torchaudio.load(audio_path, format='wav')
+    audio = torchaudio.functional.resample(audio, orig_freq=sr, new_freq=processor.feature_extractor.sampling_rate)
     audios.append(audio)
 
     messages = [
@@ -155,7 +165,54 @@ for count, path in enumerate(paths):
             "role": "user",
             "content": [
                 {"type": "audio", "audio_url": audio_path},
-                {"type": "text", "text": f"Convert the following to MPE according to the audio\n\n{tokenized_midi}"}
+                {"type": "text", "text": f"Convert this audio to MIDI"}
+            ]
+        },
+        {
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": tokenized_midi
+                }
+            ]
+        }
+    ]
+
+    instruction_lens.append(len(processor.apply_chat_template([messages[:2]], add_generation_prompt=False, tokenize=True)))
+    formatted_text = processor.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
+    text_prompts.append(formatted_text)
+    print(f"\rProcessing MusicNet MIDI samples... {i}/{len(MUSICNET_AUDIO_PATHS)}", end="")
+print()
+
+paths = list(SAMPLE_PATHS)
+for count, path in enumerate(paths):
+    audio_path = f"{path}/audio.wav"
+    midi_path = f"{path}/plain.mid"
+    mpe_path = f"{path}/mpe.mid"
+
+    tokenized_midi = midi_compactor.midi_to_str(midi_path)
+    tokenized_mpe = midi_compactor.midi_to_str(mpe_path, mpe=True)
+
+    audio, sr = torchaudio.load(audio_path, format='wav')
+    audio = torchaudio.functional.resample(audio, orig_freq=sr, new_freq=processor.feature_extractor.sampling_rate)
+    audios.append(audio)
+
+    messages = [
+        {
+            "role": "system",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "You are a helpful assistant."
+                }
+            ]
+        },
+        {
+            "role": "user",
+            "content": [
+                {"type": "audio", "audio_url": audio_path},
+                {"type": "text", "text": f"Convert this audio to MPE MIDI\n\n{tokenized_midi}"}
             ]
         },
         {
@@ -169,19 +226,26 @@ for count, path in enumerate(paths):
         }
     ]
 
-    instruction_lens.append(len(processor.apply_chat_template([messages[0]], add_generation_prompt=False, tokenize=True)))
+    instruction_lens.append(len(processor.apply_chat_template([messages[:2]], add_generation_prompt=False, tokenize=True)))
     formatted_text = processor.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
     text_prompts.append(formatted_text)
-
-    print(f"\r{count}/{len(paths)}", end="")
+    print(f"\rProcessing MPE samples... {count}/{len(paths)}", end="")
 print()
+
+augments = [
+    RandomApply(PolarityInversion(), p=0.5),
+    RandomApply(Noise(min_snr=0.1, max_snr=0.5), p=0.6),
+    RandomApply(Reverb(processor.feature_extractor.sampling_rate), p=0.75),
+    RandomApply(Gain(min_gain=-10, max_gain=10), p=0.9)
+]
+transform = Compose(augments)
 
 def data_collator(features):
     text = [f["text"] for f in features]
     audio = [f["audio"] for f in features]
     lens = [f["instruction_len"] for f in features]
 
-    inputs = processor(text=text, audio=audio, return_tensors="pt", padding=True, sampling_rate=processor.feature_extractor.sampling_rate)
+    inputs = processor(text=text, audio=transform(audio), return_tensors="pt", padding=True, sampling_rate=processor.feature_extractor.sampling_rate)
     inputs["labels"] = inputs["input_ids"].clone()
     padding_mask = inputs["input_ids"] == processor.tokenizer.pad_token_id
     inputs["attention_mask"] = padding_mask == False
@@ -194,8 +258,6 @@ def data_collator(features):
     return inputs
 
 dataset = Dataset.from_dict({"text": text_prompts, "audio": audios, "instruction_len": instruction_lens})
-
-# --- 4. Training Arguments ---
 
 training_args = TrainingArguments(
     output_dir=OUTPUT_DIR,
@@ -211,8 +273,6 @@ training_args = TrainingArguments(
     remove_unused_columns=False
 )
 
-# --- 5. Trainer ---
-
 trainer = Trainer(
     model=model,
     args=training_args,
@@ -221,7 +281,6 @@ trainer = Trainer(
     data_collator=data_collator
 )
 
-# --- 6. Train ---
 print("Starting training...")
 trainer.train()
 

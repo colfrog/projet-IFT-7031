@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 
 MODEL_ID = "Qwen/Qwen2-Audio-7B-Instruct"
-OUTPUT_DIR = "./qwen2-audio-finetuned-v2"
+OUTPUT_DIR = "./qwen2-audio-finetuned-v3"
 ADAPTER_PATH = OUTPUT_DIR
 MODEL_PATH = Path("/home/lcimon/scratch/hub/models--Qwen--Qwen2-Audio-7B-Instruct/snapshots/0a095220c30b7b31434169c3086508ef3ea5bf0a/")
 DATA_PATH = Path("/home/lcimon/scratch/training_data")
@@ -114,13 +114,16 @@ messages = [
         "role": "user",
         "content": [
             {"type": "audio", "audio_url": audio_path},
-            {"type": "text", "text": f"Convert the following to MPE according to the audio\n\n{tokenized_midi}"}
+            {"type": "text", "text": f"Convert the audio to MPE MIDI\n\n{tokenized_midi}"}
         ]
     }
 ]
 
+# TODO: turn this into a proper testing script with recall and precision
+
 formatted_text = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
 inputs = processor(text=formatted_text, audio=audio, return_tensors="pt", padding=True, sampling_rate=processor.feature_extractor.sampling_rate)
+print(inputs.keys(), len(inputs['labels']), len(processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)))
 for key in inputs:
     inputs[key] = inputs[key].cuda()
 
