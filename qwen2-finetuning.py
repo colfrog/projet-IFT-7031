@@ -147,7 +147,13 @@ midi_compactor = RemiCompactor()
 for i in range(len(MUSICNET_AUDIO_PATHS)):
     audio_path = MUSICNET_AUDIO_PATHS[i]
     midi_path = MUSICNET_MIDI_PATHS[i]
-    tokenized_midi = midi_compactor.midi_to_str(midi_path)
+    print(f"\rProcessing MusicNet MIDI samples... {i}/{len(MUSICNET_AUDIO_PATHS)}", end='')
+    try:
+        tokenized_midi = midi_compactor.midi_to_str(midi_path)
+    except RuntimeError:
+        print("\nignored: failed to tokenize midi")
+        continue
+
     audio, sr = torchaudio.load(audio_path, format='wav')
     audio = torchaudio.functional.resample(audio, orig_freq=sr, new_freq=processor.feature_extractor.sampling_rate)
     audios.append(audio)
@@ -183,7 +189,7 @@ for i in range(len(MUSICNET_AUDIO_PATHS)):
     instruction_lens.append(len(processor.apply_chat_template([messages[:2]], add_generation_prompt=False, tokenize=True)))
     formatted_text = processor.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
     text_prompts.append(formatted_text)
-    print(f"\rProcessing MusicNet MIDI samples... {i}/{len(MUSICNET_AUDIO_PATHS)}", end="")
+    print(f"\rProcessing MusicNet MIDI samples... {i + 1}/{len(MUSICNET_AUDIO_PATHS)}", end='')
 print()
 
 paths = list(SAMPLE_PATHS)
