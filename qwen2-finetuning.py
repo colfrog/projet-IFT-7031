@@ -38,7 +38,6 @@ MODEL_PATH = Path("/home/lcimon/scratch/hub/models--Qwen--Qwen2-Audio-7B-Instruc
 DATA_PATH = Path("/home/lcimon/scratch/training_data")
 MIDI_PATHS = list(DATA_PATH.glob("**/*.mid"))
 SAMPLE_PATHS = list(DATA_PATH.glob("*/*"))
-MAX_SIZE = 8192
 
 print(f"CUDA Version: {torch.version.cuda}")
 
@@ -140,104 +139,21 @@ class RemiCompactor():
         return " ".join(tokens.tokens)
 
 print("Processing dataset...")
-audios = []
-text_prompts = []
-instruction_lens = []
+audio_paths = []
+midi_paths = []
+mpe_paths = []
 midi_compactor = RemiCompactor()
+
 for i in range(len(MUSICNET_AUDIO_PATHS)):
-    audio_path = MUSICNET_AUDIO_PATHS[i]
-    midi_path = MUSICNET_MIDI_PATHS[i]
-    print(f"\rProcessing MusicNet MIDI samples... {i}/{len(MUSICNET_AUDIO_PATHS)}", end='')
-    try:
-        tokenized_midi = midi_compactor.midi_to_str(midi_path)
-    except RuntimeError:
-        print("\nignored: failed to tokenize midi")
-        continue
-
-    audio, sr = torchaudio.load(audio_path, format='wav')
-    audio = torchaudio.functional.resample(audio, orig_freq=sr, new_freq=processor.feature_extractor.sampling_rate)
-    audios.append(audio)
-
-    messages = [
-        {
-            "role": "system",
-            "content": [
-                {
-                    "type": "text",
-                    "text": "You are a helpful assistant."
-                }
-            ]
-        },
-        {
-            "role": "user",
-            "content": [
-                {"type": "audio", "audio_url": audio_path},
-                {"type": "text", "text": f"Convert this audio to MIDI"}
-            ]
-        },
-        {
-            "role": "assistant",
-            "content": [
-                {
-                    "type": "text",
-                    "text": tokenized_midi
-                }
-            ]
-        }
-    ]
-
-    instruction_lens.append(len(processor.apply_chat_template([messages[:2]], add_generation_prompt=False, tokenize=True)))
-    formatted_text = processor.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
-    text_prompts.append(formatted_text)
-    print(f"\rProcessing MusicNet MIDI samples... {i + 1}/{len(MUSICNET_AUDIO_PATHS)}", end='')
-print()
+    audio_paths.append(MUSICNET_AUDIO_PATHS[i])
+    midi_paths.append(MUSICNET_MIDI_PATHS[i])
+    mpe_paths.append(None)
 
 paths = list(SAMPLE_PATHS)
 for count, path in enumerate(paths):
-    audio_path = f"{path}/audio.wav"
-    midi_path = f"{path}/plain.mid"
-    mpe_path = f"{path}/mpe.mid"
-
-    tokenized_midi = midi_compactor.midi_to_str(midi_path)
-    tokenized_mpe = midi_compactor.midi_to_str(mpe_path, mpe=True)
-
-    audio, sr = torchaudio.load(audio_path, format='wav')
-    audio = torchaudio.functional.resample(audio, orig_freq=sr, new_freq=processor.feature_extractor.sampling_rate)
-    audios.append(audio)
-
-    messages = [
-        {
-            "role": "system",
-            "content": [
-                {
-                    "type": "text",
-                    "text": "You are a helpful assistant."
-                }
-            ]
-        },
-        {
-            "role": "user",
-            "content": [
-                {"type": "audio", "audio_url": audio_path},
-                {"type": "text", "text": f"Convert this audio to MPE MIDI\n\n{tokenized_midi}"}
-            ]
-        },
-        {
-            "role": "assistant",
-            "content": [
-                {
-                    "type": "text",
-                    "text": tokenized_mpe
-                }
-            ]
-        }
-    ]
-
-    instruction_lens.append(len(processor.apply_chat_template([messages[:2]], add_generation_prompt=False, tokenize=True)))
-    formatted_text = processor.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
-    text_prompts.append(formatted_text)
-    print(f"\rProcessing MPE samples... {count}/{len(paths)}", end="")
-print()
+    audio_paths.append(f"{path}/audio.wav")
+    midi_paths.append(f"{path}/plain.mid")
+    mpe_paths.append(f"{path}/mpe.mid")
 
 # We may add more later
 augments = [
@@ -250,23 +166,99 @@ augments = [
 transform = Compose(augments)
 
 def data_collator(features):
-    text = [f["text"] for f in features]
-    audio = [f["audio"] for f in features]
-    lens = [f["instruction_len"] for f in features]
+    text_prompts = []
+    audios = []
+    instruction_lens = []
+    for f in features:
+        midi_path = f["text"]
+        mpe_path = f["audio"]
+        audio_path = f["instruction_len"]
 
-    inputs = processor(text=text, audio=transform(audio), return_tensors="pt", padding=True, sampling_rate=processor.feature_extractor.sampling_rate)
+        try:
+            tokenized_midi = midi_compactor.midi_to_str(midi_path)
+        except RuntimeError:
+            print("{Path(midi_path).stem} ignored: failed to tokenize midi")
+            continue
+        tokenized_mpe = midi_compactor.midi_to_str(mpe_path, mpe=True)
+
+        audio, sr = torchaudio.load(audio_path, format='wav')
+        audio = torchaudio.functional.resample(audio, orig_freq=sr, new_freq=processor.feature_extractor.sampling_rate)
+        audios.append(transform(audio))
+
+        if mpe_path is None:
+            messages = [
+                {
+                    "role": "system",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "You are a helpful assistant."
+                        }
+                    ]
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "audio", "audio_url": audio_path},
+                        {"type": "text", "text": f"Convert this audio to MIDI"}
+                    ]
+                },
+                {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": tokenized_midi
+                        }
+                    ]
+                }
+            ]
+        else:
+            messages = [
+                {
+                    "role": "system",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "You are a helpful assistant."
+                        }
+                    ]
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "audio", "audio_url": audio_path},
+                        {"type": "text", "text": f"Convert this audio to MPE MIDI\n\n{tokenized_midi}"}
+                    ]
+                },
+                {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": tokenized_mpe
+                        }
+                    ]
+                }
+            ]
+
+        instruction_lens.append(len(processor.apply_chat_template([messages[:2]], add_generation_prompt=False, tokenize=True)))
+        text = processor.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
+        text_prompts.append(text)
+
+    inputs = processor(text=text_prompts, audio=audios, return_tensors="pt", padding=True, sampling_rate=processor.feature_extractor.sampling_rate)
     inputs["labels"] = inputs["input_ids"].clone()
     padding_mask = inputs["input_ids"] == processor.tokenizer.pad_token_id
     inputs["attention_mask"] = padding_mask == False
     inputs["labels"][padding_mask] = -100
 
     # Ignore the user input to avoid learning it.
-    for i, prompt_len in enumerate(lens):
+    for i, prompt_len in enumerate(instruction_lens):
         inputs["labels"][i, :prompt_len] = -100
 
     return inputs
 
-dataset = Dataset.from_dict({"text": text_prompts, "audio": audios, "instruction_len": instruction_lens})
+dataset = Dataset.from_dict({"midi": midi_paths, "mpe": mpe_paths, "audio": audio_paths})
 train_dataset, eval_dataset = torch.utils.data.random_split(dataset, [int(len(dataset) * 0.9), len(dataset) - int(len(dataset) * 0.9)])
 
 def compute_metrics(pred):
