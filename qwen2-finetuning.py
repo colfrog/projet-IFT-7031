@@ -243,9 +243,9 @@ print()
 augments = [
     RandomApply(PolarityInversion(), p=0.5),
     RandomApply(Noise(min_snr=0.1, max_snr=0.5), p=0.6),
-    RandomApply(Reverb(processor.feature_extractor.sample_rate), p=0.5), # It's not random or exaggerated but it's better than nothing
+    RandomApply(Reverb(processor.feature_extractor.sampling_rate), p=0.5), # It's not random or exaggerated but it's better than nothing
     RandomApply(Gain(min_gain=-10, max_gain=10), p=0.9),
-    RandomApply(HighLowPass(processor.feature_extractor.sample_rate), p=0.5)
+    RandomApply(HighLowPass(processor.feature_extractor.sampling_rate), p=0.5)
 ]
 transform = Compose(augments)
 
