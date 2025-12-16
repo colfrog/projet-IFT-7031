@@ -5,6 +5,24 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9ee95e9e-2216-4000-82c2-82c605758160" name="Changes" comment="Modify the script">
+      <change afterPath="$PROJECT_DIR$/data/RIR.wav" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/data/speech.wav" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/reverb_test.ipynb" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/apply.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/delay.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/filter.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/gain.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/high_low_pass.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/noise.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/pitch_shift.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/polarity_inversion.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/random_resized_crop.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/reverb.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/reverse.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/compose.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/qwen2-finetuning.py" beforeDir="false" afterPath="$PROJECT_DIR$/qwen2-finetuning.py" afterDir="false" />
     </list>
@@ -16,8 +34,8 @@
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
-        <option value="Jupyter Notebook" />
         <option value="Python Script" />
+        <option value="Jupyter Notebook" />
       </list>
     </option>
   </component>
@@ -32,33 +50,34 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;Python.basic-pitch.executor&quot;: &quot;Run&quot;,
-    &quot;Python.make_json.executor&quot;: &quot;Run&quot;,
-    &quot;Python.qwen2-test.executor&quot;: &quot;Run&quot;,
-    &quot;Python.remi.executor&quot;: &quot;Run&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1&quot;: &quot;true&quot;,
-    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
-    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/home/laurent/PycharmProjects/projet-IFT-7031&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,
-    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "Python.basic-pitch.executor": "Run",
+    "Python.make_json.executor": "Run",
+    "Python.qwen2-test.executor": "Run",
+    "Python.remi.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultAutoModeForALLUsers.v1": "true",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
+    "git-widget-placeholder": "master",
+    "junie.onboarding.icon.badge.shown": "true",
+    "last_opened_file_path": "/home/laurent/PycharmProjects/projet-IFT-7031/data",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
+    "to.speed.mode.migration.done": "true",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/data" />
       <recent name="$PROJECT_DIR$" />
     </key>
     <key name="MoveFile.RECENT_KEYS">

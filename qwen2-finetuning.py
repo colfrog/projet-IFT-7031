@@ -1,7 +1,6 @@
 import torch
-import json
 import torchaudio
-from torchaudio_augmentations import Compose, RandomApply, PolarityInversion, Noise, Gain
+from torchaudio_augmentations import Compose, RandomApply, PolarityInversion, Noise, Gain, Reverb
 from datasets import Dataset
 from transformers import (
     Qwen2AudioForConditionalGeneration,
@@ -249,7 +248,7 @@ class Reverb(torch.nn.Module):
 augments = [
     RandomApply(PolarityInversion(), p=0.5),
     RandomApply(Noise(min_snr=0.1, max_snr=0.5), p=0.6),
-    RandomApply(Reverb(processor.feature_extractor.sampling_rate), p=0.75),
+    # We should eventually have reverb but it's not easy
     RandomApply(Gain(min_gain=-10, max_gain=10), p=0.9)
 ]
 transform = Compose(augments)
