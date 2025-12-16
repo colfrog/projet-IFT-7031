@@ -5,26 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="9ee95e9e-2216-4000-82c2-82c605758160" name="Changes" comment="Modify the script">
-      <change afterPath="$PROJECT_DIR$/data/RIR.wav" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/data/speech.wav" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/reverb_test.ipynb" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/README.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/apply.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/delay.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/filter.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/gain.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/high_low_pass.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/noise.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/pitch_shift.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/polarity_inversion.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/random_resized_crop.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/reverb.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/reverse.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/torchaudio_augmentations/compose.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/RIR.wav" beforeDir="false" afterPath="$PROJECT_DIR$/data/RIR.wav" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/qwen2-finetuning.py" beforeDir="false" afterPath="$PROJECT_DIR$/qwen2-finetuning.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/reverb_test.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/reverb_test.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/reverb.py" beforeDir="false" afterPath="$PROJECT_DIR$/torchaudio_augmentations/augmentations/reverb.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

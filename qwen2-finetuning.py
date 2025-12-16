@@ -233,22 +233,11 @@ for count, path in enumerate(paths):
     print(f"\rProcessing MPE samples... {count}/{len(paths)}", end="")
 print()
 
-# Make our own Reverb module based on the pytorch data augmentation tutorial
-class Reverb(torch.nn.Module):
-    def __init__(self, sr):
-        super(Reverb, self).__init__()
-        self.sr = sr
-
-    def forward(self, audio):
-        audio = audio[:, int(self.sr*1.01):int(self.sr*1.3)]
-        audio = audio/torch.linalg.vector_norm(audio, ord=2)
-        return audio
-
 # We may add more later
 augments = [
     RandomApply(PolarityInversion(), p=0.5),
     RandomApply(Noise(min_snr=0.1, max_snr=0.5), p=0.6),
-    # We should eventually have reverb but it's not easy
+    RandomApply(Reverb(processor.feature_extractor.sample_rate), p=0.5), # It's not random or exaggerated but it's better than nothing
     RandomApply(Gain(min_gain=-10, max_gain=10), p=0.9)
 ]
 transform = Compose(augments)
