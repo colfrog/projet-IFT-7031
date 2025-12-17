@@ -57,8 +57,9 @@ print(f"Sampling rate: {processor.feature_extractor.sampling_rate}")
 model = Qwen2AudioForConditionalGeneration.from_pretrained(
     MODEL_PATH if os.path.exists(MODEL_PATH) else MODEL_ID,
     device_map="auto",
+    dtype=torch.float16,
     quantization_config=bnb_config,
-    attn_implementation="eager"
+    attn_implementation="sdpa"
 )
 
 # Prepare model for LoRA
@@ -145,16 +146,17 @@ mpe_paths = []
 midi_compactor = RemiCompactor()
 MAX_FRAMES = 600000
 ignored = 0
-for i in range(len(MUSICNET_AUDIO_PATHS)):
-    metadata = torchaudio.info(MUSICNET_AUDIO_PATHS[i])
-    if metadata.num_frames > MAX_FRAMES: # Ignore large audio files to avoid running out of memory
-        ignore += 1
-        continue
-    audio_paths.append(str(MUSICNET_AUDIO_PATHS[i]))
-    midi_paths.append(str(MUSICNET_MIDI_PATHS[i]))
-    mpe_paths.append("")
+### MusicNet files are too big to train on, this should be explored in further works
+#for i in range(len(MUSICNET_AUDIO_PATHS)):
+    #metadata = torchaudio.info(MUSICNET_AUDIO_PATHS[i])
+    #if metadata.num_frames > MAX_FRAMES: # Ignore large audio files to avoid running out of memory
+        #ignored += 1
+        #continue
+    #audio_paths.append(str(MUSICNET_AUDIO_PATHS[i]))
+    #midi_paths.append(str(MUSICNET_MIDI_PATHS[i]))
+    #mpe_paths.append("")
 
-print(f"{ignored} samples ignored due to size")
+#print(f"{ignored} samples ignored due to size")
 
 paths = list(SAMPLE_PATHS)
 for count, path in enumerate(paths):
@@ -262,7 +264,6 @@ def data_collator(features):
     inputs = processor(text=text_prompts, audio=audios, return_tensors="pt", padding=True, sampling_rate=processor.feature_extractor.sampling_rate)
     inputs["labels"] = inputs["input_ids"].clone()
     padding_mask = inputs["input_ids"] == processor.tokenizer.pad_token_id
-    inputs["attention_mask"] = padding_mask == False
     inputs["labels"][padding_mask] = -100
 
     # Ignore the user input to avoid learning it.
@@ -284,6 +285,7 @@ def compute_metrics(pred):
 training_args = TrainingArguments(
     output_dir=OUTPUT_DIR,
     per_device_train_batch_size=1,
+    per_device_eval_batch_size=1,
     gradient_accumulation_steps=8,
     learning_rate=1e-4,
     num_train_epochs=3,
@@ -292,7 +294,9 @@ training_args = TrainingArguments(
     save_strategy="epoch",
     save_total_limit=1,
     report_to="none",
-    remove_unused_columns=False
+    remove_unused_columns=False,
+    gradient_checkpointing=True,
+    gradient_checkpointing_kwargs={"use_reentrant": False},
 )
 
 trainer = Trainer(
@@ -302,11 +306,14 @@ trainer = Trainer(
     eval_dataset=eval_dataset,
     processing_class=processor,
     data_collator=data_collator,
-    compute_metrics=compute_metrics
+    compute_metrics=compute_metrics,
 )
 
 print("Starting training...")
 trainer.train()
+
+print("Evaluating...")
+print(trainer.evaluate())
 
 print(f"Training finished. Saving to {OUTPUT_DIR}")
 trainer.save_model(OUTPUT_DIR)
