@@ -273,7 +273,10 @@ def data_collator(features):
     return inputs
 
 dataset = Dataset.from_dict({"midi": midi_paths, "mpe": mpe_paths, "audio": audio_paths})
-train_dataset, eval_dataset = torch.utils.data.random_split(dataset, [int(len(dataset) * 0.9), len(dataset) - int(len(dataset) * 0.9)])
+# I haven't found a good way to compute the metrics on a large test set,
+# it has to accumulate a large amount of data (the predictions) on the GPU or CPU memory
+# So we eval on 10 samples
+train_dataset, eval_dataset = torch.utils.data.random_split(dataset, [dataset - 10, 10])
 
 def compute_metrics(pred):
     labels = pred.label_ids
@@ -297,6 +300,8 @@ training_args = TrainingArguments(
     remove_unused_columns=False,
     gradient_checkpointing=True,
     gradient_checkpointing_kwargs={"use_reentrant": False},
+    eval_strategy="epoch",
+    eval_accumulation_steps=1
 )
 
 trainer = Trainer(
