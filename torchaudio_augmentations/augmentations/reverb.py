@@ -25,5 +25,5 @@ class Reverb(torch.nn.Module):
         for i in range(3):
             mic[i] = torch.randint(room[i], (1,))
 
-        print(audio.shape)
-        return torchaudio.functional.fftconvolve(audio, self.rir)[0, :audio.size(1)]
+        reverbed = torchaudio.functional.fftconvolve(audio, self.rir)[:, :audio.size(1)]
+        return reverbed

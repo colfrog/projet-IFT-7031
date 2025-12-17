@@ -15,6 +15,7 @@ source ~/.bashrc
 source .venv/bin/activate
 export HF_HOME=/home/lcimon/scratch
 export KAGGLEHUB_CACHE=/home/lcimon/scratch/kaggle
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 python qwen2-finetuning.py
 

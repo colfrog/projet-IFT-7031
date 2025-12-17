@@ -143,11 +143,18 @@ audio_paths = []
 midi_paths = []
 mpe_paths = []
 midi_compactor = RemiCompactor()
-
+MAX_FRAMES = 600000
+ignored = 0
 for i in range(len(MUSICNET_AUDIO_PATHS)):
-    audio_paths.append(MUSICNET_AUDIO_PATHS[i])
-    midi_paths.append(MUSICNET_MIDI_PATHS[i])
-    mpe_paths.append(None)
+    metadata = torchaudio.info(MUSICNET_AUDIO_PATHS[i])
+    if metadata.num_frames > MAX_FRAMES: # Ignore large audio files to avoid running out of memory
+        ignore += 1
+        continue
+    audio_paths.append(str(MUSICNET_AUDIO_PATHS[i]))
+    midi_paths.append(str(MUSICNET_MIDI_PATHS[i]))
+    mpe_paths.append("")
+
+print(f"{ignored} samples ignored due to size")
 
 paths = list(SAMPLE_PATHS)
 for count, path in enumerate(paths):
@@ -157,35 +164,39 @@ for count, path in enumerate(paths):
 
 # We may add more later
 augments = [
-    RandomApply(PolarityInversion(), p=0.5),
-    RandomApply(Noise(min_snr=0.1, max_snr=0.5), p=0.6),
-    RandomApply(Reverb(processor.feature_extractor.sampling_rate), p=0.5), # It's not random or exaggerated but it's better than nothing
-    RandomApply(Gain(min_gain=-10, max_gain=10), p=0.9),
-    RandomApply(HighLowPass(processor.feature_extractor.sampling_rate), p=0.5)
+    RandomApply([PolarityInversion()], p=0.5),
+    RandomApply([Noise(min_snr=0.1, max_snr=0.5)], p=0.6),
+    RandomApply([Reverb(processor.feature_extractor.sampling_rate)], p=0.5), # It's not random or exaggerated but it's better than nothing
+    RandomApply([Gain(min_gain=-10, max_gain=10)], p=0.9),
+    RandomApply([HighLowPass(processor.feature_extractor.sampling_rate)], p=0.5)
 ]
-transform = Compose(augments)
+transform = RandomApply([Compose(augments)], p=0.8) # We want 20% of the samples to not have augmentations.
 
 def data_collator(features):
     text_prompts = []
     audios = []
     instruction_lens = []
     for f in features:
-        midi_path = f["text"]
-        mpe_path = f["audio"]
-        audio_path = f["instruction_len"]
+        midi_path = f["midi"]
+        mpe_path = f["mpe"]
+        audio_path = f["audio"]
 
         try:
             tokenized_midi = midi_compactor.midi_to_str(midi_path)
         except RuntimeError:
             print("{Path(midi_path).stem} ignored: failed to tokenize midi")
             continue
-        tokenized_mpe = midi_compactor.midi_to_str(mpe_path, mpe=True)
+        if mpe_path != "":
+            tokenized_mpe = midi_compactor.midi_to_str(mpe_path, mpe=True)
 
         audio, sr = torchaudio.load(audio_path, format='wav')
         audio = torchaudio.functional.resample(audio, orig_freq=sr, new_freq=processor.feature_extractor.sampling_rate)
-        audios.append(transform(audio))
+        audio = transform(audio) # Apply transforms
+        audio = torch.mean(audio, dim=0) # Transform to mono
+        audio = audio.numpy().squeeze()
+        audios.append(audio)
 
-        if mpe_path is None:
+        if mpe_path == "":
             messages = [
                 {
                     "role": "system",
@@ -242,7 +253,9 @@ def data_collator(features):
                 }
             ]
 
-        instruction_lens.append(len(processor.apply_chat_template([messages[:2]], add_generation_prompt=False, tokenize=True)))
+        prompt = processor.apply_chat_template([messages[:2]], add_generation_prompt=False, tokenize=False)
+        prompt_tokens = processor.tokenizer(prompt, add_special_tokens=False)
+        instruction_lens.append(len(prompt_tokens))
         text = processor.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
         text_prompts.append(text)
 
@@ -287,7 +300,7 @@ trainer = Trainer(
     args=training_args,
     train_dataset=train_dataset,
     eval_dataset=eval_dataset,
-    tokenizer=processor.tokenizer,
+    processing_class=processor,
     data_collator=data_collator,
     compute_metrics=compute_metrics
 )
