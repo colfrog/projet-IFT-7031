@@ -276,7 +276,7 @@ dataset = Dataset.from_dict({"midi": midi_paths, "mpe": mpe_paths, "audio": audi
 # I haven't found a good way to compute the metrics on a large test set,
 # it has to accumulate a large amount of data (the predictions) on the GPU or CPU memory
 # So we eval on 10 samples
-train_dataset, eval_dataset = torch.utils.data.random_split(dataset, [dataset - 10, 10])
+train_dataset, eval_dataset = torch.utils.data.random_split(dataset, [len(dataset)*0.95, len(dataset) - len(dataset)*0.95])
 
 def compute_metrics(pred):
     labels = pred.label_ids
