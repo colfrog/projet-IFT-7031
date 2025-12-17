@@ -140,9 +140,6 @@ class RemiCompactor():
         return " ".join(tokens.tokens)
 
 print("Processing dataset...")
-audio_paths = []
-midi_paths = []
-mpe_paths = []
 midi_compactor = RemiCompactor()
 MAX_FRAMES = 600000
 ignored = 0
@@ -158,11 +155,59 @@ ignored = 0
 
 #print(f"{ignored} samples ignored due to size")
 
+audios = []
+text_prompts = []
+instruction_lens = []
 paths = list(SAMPLE_PATHS)
 for count, path in enumerate(paths):
-    audio_paths.append(f"{path}/audio.wav")
-    midi_paths.append(f"{path}/plain.mid")
-    mpe_paths.append(f"{path}/mpe.mid")
+    print(f"\r{count}/{len(paths)}")
+    midi_path = f"{path}/plain.mid"
+    mpe_path = f"{path}/mpe.mid"
+    audio_path = f"{path}/audio.wav"
+
+    tokenized_midi = midi_compactor.midi_to_str(midi_path)
+    tokenized_mpe = midi_compactor.midi_to_str(mpe_path, mpe=True)
+
+    audio, sr = torchaudio.load(audio_path, format='wav')
+    audio = torchaudio.functional.resample(audio, orig_freq=sr, new_freq=processor.feature_extractor.sampling_rate)
+    audio = torch.mean(audio, dim=0)  # Transform to mono
+    audio = audio.numpy().squeeze()
+    audios.append(audio)
+
+    messages = [
+        {
+            "role": "system",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "You are a helpful assistant."
+                }
+            ]
+        },
+        {
+            "role": "user",
+            "content": [
+                {"type": "audio", "audio_url": audio_path},
+                {"type": "text", "text": f"Convert this audio to MPE MIDI\n\n{tokenized_midi}"}
+            ]
+        },
+        {
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "text",
+                    "text": tokenized_mpe
+                }
+            ]
+        }
+    ]
+
+    prompt = processor.apply_chat_template([messages[:2]], add_generation_prompt=False, tokenize=False)
+    prompt_tokens = processor.tokenizer(prompt, add_special_tokens=False)
+    instruction_lens.append(len(prompt_tokens))
+    text = processor.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
+    text_prompts.append(text)
+print()
 
 # We may add more later
 augments = [
@@ -175,91 +220,9 @@ augments = [
 transform = RandomApply([Compose(augments)], p=0.8) # We want 20% of the samples to not have augmentations.
 
 def data_collator(features):
-    text_prompts = []
-    audios = []
-    instruction_lens = []
-    for f in features:
-        midi_path = f["midi"]
-        mpe_path = f["mpe"]
-        audio_path = f["audio"]
-
-        try:
-            tokenized_midi = midi_compactor.midi_to_str(midi_path)
-        except RuntimeError:
-            print("{Path(midi_path).stem} ignored: failed to tokenize midi")
-            continue
-        if mpe_path != "":
-            tokenized_mpe = midi_compactor.midi_to_str(mpe_path, mpe=True)
-
-        audio, sr = torchaudio.load(audio_path, format='wav')
-        audio = torchaudio.functional.resample(audio, orig_freq=sr, new_freq=processor.feature_extractor.sampling_rate)
-        audio = transform(audio) # Apply transforms
-        audio = torch.mean(audio, dim=0) # Transform to mono
-        audio = audio.numpy().squeeze()
-        audios.append(audio)
-
-        if mpe_path == "":
-            messages = [
-                {
-                    "role": "system",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "You are a helpful assistant."
-                        }
-                    ]
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "audio", "audio_url": audio_path},
-                        {"type": "text", "text": f"Convert this audio to MIDI"}
-                    ]
-                },
-                {
-                    "role": "assistant",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": tokenized_midi
-                        }
-                    ]
-                }
-            ]
-        else:
-            messages = [
-                {
-                    "role": "system",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": "You are a helpful assistant."
-                        }
-                    ]
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "audio", "audio_url": audio_path},
-                        {"type": "text", "text": f"Convert this audio to MPE MIDI\n\n{tokenized_midi}"}
-                    ]
-                },
-                {
-                    "role": "assistant",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": tokenized_mpe
-                        }
-                    ]
-                }
-            ]
-
-        prompt = processor.apply_chat_template([messages[:2]], add_generation_prompt=False, tokenize=False)
-        prompt_tokens = processor.tokenizer(prompt, add_special_tokens=False)
-        instruction_lens.append(len(prompt_tokens))
-        text = processor.apply_chat_template(messages, add_generation_prompt=False, tokenize=False)
-        text_prompts.append(text)
+    audios = [f["audio"] for f in features]
+    text_prompts = [f["text"] for f in features]
+    instruction_lens = [f["len"] for f in features]
 
     inputs = processor(text=text_prompts, audio=audios, return_tensors="pt", padding=True, sampling_rate=processor.feature_extractor.sampling_rate)
     inputs["labels"] = inputs["input_ids"].clone()
@@ -272,11 +235,28 @@ def data_collator(features):
 
     return inputs
 
-dataset = Dataset.from_dict({"midi": midi_paths, "mpe": mpe_paths, "audio": audio_paths})
+dataset = Dataset.from_dict({"audio": audios, "text": text_prompts, "len": instruction_lens})
 # I haven't found a good way to compute the metrics on a large test set,
 # it has to accumulate a large amount of data (the predictions) on the GPU or CPU memory
 # So we eval on 10 samples
-train_dataset, eval_dataset = torch.utils.data.random_split(dataset, [len(dataset)*0.95, len(dataset) - len(dataset)*0.95])
+train_dataset, eval_dataset = torch.utils.data.random_split(dataset, [int(len(dataset)*0.95), len(dataset) - int(len(dataset)*0.95)])
+
+# Custom dataset to apply transformations at the time of accessing the data only on the training set
+class TransformDataset(Dataset):
+    def __init__(self, dataset, transform):
+        super(TransformDataset, self).__init__()
+        self.base = dataset
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.base)
+
+    def __getitem__(self, idx):
+        sample = self.base[idx]
+        sample["audio"] = self.transform(sample["audio"])
+        return sample
+
+train_dataset = TransformDataset(train_dataset, transform)
 
 def compute_metrics(pred):
     labels = pred.label_ids
