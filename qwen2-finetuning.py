@@ -299,9 +299,6 @@ trainer = Trainer(
 print("Starting training...")
 trainer.train()
 
-print("Evaluating...")
-print(trainer.evaluate())
-
 print(f"Training finished. Saving to {OUTPUT_DIR}")
 trainer.save_model(OUTPUT_DIR)
 processor.save_pretrained(OUTPUT_DIR)
