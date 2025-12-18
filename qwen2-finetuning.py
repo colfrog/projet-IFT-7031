@@ -223,8 +223,9 @@ def data_collator(features):
     instruction_lens = [f["len"] for f in features]
 
     processed_audios = []
-    for a in audios:
-        audio = torch.mean(a, dim=0)  # Transform to mono
+    for audio in audios:
+        audio = transform(audio) # Apply transformations
+        audio = torch.mean(audio, dim=0)  # Convert to mono
         audio = audio.numpy().squeeze() # Make sure we have a 1D numpy array
         processed_audios.append(audio)
 
@@ -242,23 +243,6 @@ def data_collator(features):
 dataset = Dataset.from_dict({"audio": audios, "text": text_prompts, "len": instruction_lens})
 # Use 5% for eval
 train_dataset, eval_dataset = torch.utils.data.random_split(dataset, [int(len(dataset)*0.95), len(dataset) - int(len(dataset)*0.95)])
-
-# Custom dataset to apply transformations at the time of accessing the data only on the training set
-class TransformDataset(Dataset):
-    def __init__(self, dataset, transform):
-        super(TransformDataset, self).__init__()
-        self.base = dataset
-        self.transform = transform
-
-    def __len__(self):
-        return len(self.base)
-
-    def __getitem__(self, idx):
-        sample = self.base[idx]
-        sample["audio"] = self.transform(sample["audio"])
-        return sample
-
-train_dataset = TransformDataset(train_dataset, transform)
 
 def compute_metrics(pred):
     labels = pred.label_ids
