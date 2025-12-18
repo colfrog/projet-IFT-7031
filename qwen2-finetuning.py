@@ -224,7 +224,7 @@ def data_collator(features):
 
     processed_audios = []
     for audio in audios:
-        audio = transform(audio) # Apply transformations
+        audio = transform(torch.tensor(audio)) # Apply transformations
         audio = torch.mean(audio, dim=0)  # Convert to mono
         audio = audio.numpy().squeeze() # Make sure we have a 1D numpy array
         processed_audios.append(audio)
