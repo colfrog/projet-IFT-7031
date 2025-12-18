@@ -160,7 +160,7 @@ text_prompts = []
 instruction_lens = []
 paths = list(SAMPLE_PATHS)
 for count, path in enumerate(paths):
-    print(f"\r{count}/{len(paths)}")
+    print(f"\r{count}/{len(paths)}", end='')
     midi_path = f"{path}/plain.mid"
     mpe_path = f"{path}/mpe.mid"
     audio_path = f"{path}/audio.wav"
@@ -170,8 +170,6 @@ for count, path in enumerate(paths):
 
     audio, sr = torchaudio.load(audio_path, format='wav')
     audio = torchaudio.functional.resample(audio, orig_freq=sr, new_freq=processor.feature_extractor.sampling_rate)
-    audio = torch.mean(audio, dim=0)  # Transform to mono
-    audio = audio.numpy().squeeze()
     audios.append(audio)
 
     messages = [
@@ -224,7 +222,13 @@ def data_collator(features):
     text_prompts = [f["text"] for f in features]
     instruction_lens = [f["len"] for f in features]
 
-    inputs = processor(text=text_prompts, audio=audios, return_tensors="pt", padding=True, sampling_rate=processor.feature_extractor.sampling_rate)
+    processed_audios = []
+    for a in audios:
+        audio = torch.mean(a, dim=0)  # Transform to mono
+        audio = audio.numpy().squeeze() # Make sure we have a 1D numpy array
+        processed_audios.append(a)
+
+    inputs = processor(text=text_prompts, audio=processed_audios, return_tensors="pt", padding=True, sampling_rate=processor.feature_extractor.sampling_rate)
     inputs["labels"] = inputs["input_ids"].clone()
     padding_mask = inputs["input_ids"] == processor.tokenizer.pad_token_id
     inputs["labels"][padding_mask] = -100
