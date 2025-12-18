@@ -160,7 +160,7 @@ text_prompts = []
 instruction_lens = []
 paths = list(SAMPLE_PATHS)
 for count, path in enumerate(paths):
-    print(f"\r{count}/{len(paths)}", end='')
+    print(f"\r{count + 1}/{len(paths)}", end='')
     midi_path = f"{path}/plain.mid"
     mpe_path = f"{path}/mpe.mid"
     audio_path = f"{path}/audio.wav"
