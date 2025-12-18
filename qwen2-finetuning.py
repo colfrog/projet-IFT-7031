@@ -241,15 +241,22 @@ def data_collator(features):
     return inputs
 
 dataset = Dataset.from_dict({"audio": audios, "text": text_prompts, "len": instruction_lens})
-# Use 5% for eval
-train_dataset, eval_dataset = torch.utils.data.random_split(dataset, [int(len(dataset)*0.95), len(dataset) - int(len(dataset)*0.95)])
+train_dataset, eval_dataset = torch.utils.data.random_split(dataset, [len(dataset) - 10, 10])
 
 def compute_metrics(pred):
     labels = pred.label_ids
-    preds = pred.predictions.argmax(-1)
+    preds = pred.predictions[0].argmax(-1)
+
+    labels_flat = labels.flatten()
+    preds_flat = preds.flatten()
+    mask = labels_flat != -100
+    labels = labels_flat[mask]
+    preds = preds_flat[mask]
+
+    accuracy = (labels == preds).mean()
     precision = precision_score(labels, preds, average="macro")
     recall = recall_score(labels, preds, average="macro")
-    return {"precision": precision, "recall": recall}
+    return {"accuracy": accuracy, "precision": precision, "recall": recall}
 
 training_args = TrainingArguments(
     output_dir=OUTPUT_DIR,
