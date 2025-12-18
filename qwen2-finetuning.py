@@ -240,9 +240,7 @@ def data_collator(features):
     return inputs
 
 dataset = Dataset.from_dict({"audio": audios, "text": text_prompts, "len": instruction_lens})
-# I haven't found a good way to compute the metrics on a large test set,
-# it has to accumulate a large amount of data (the predictions) on the GPU or CPU memory
-# So we eval on 10 samples
+# Use 5% for eval
 train_dataset, eval_dataset = torch.utils.data.random_split(dataset, [int(len(dataset)*0.95), len(dataset) - int(len(dataset)*0.95)])
 
 # Custom dataset to apply transformations at the time of accessing the data only on the training set
