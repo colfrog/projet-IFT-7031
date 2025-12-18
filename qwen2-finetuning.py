@@ -226,7 +226,7 @@ def data_collator(features):
     for a in audios:
         audio = torch.mean(a, dim=0)  # Transform to mono
         audio = audio.numpy().squeeze() # Make sure we have a 1D numpy array
-        processed_audios.append(a)
+        processed_audios.append(audio)
 
     inputs = processor(text=text_prompts, audio=processed_audios, return_tensors="pt", padding=True, sampling_rate=processor.feature_extractor.sampling_rate)
     inputs["labels"] = inputs["input_ids"].clone()
