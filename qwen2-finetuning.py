@@ -221,10 +221,13 @@ def data_collator(features):
     audios = [f["audio"] for f in features]
     text_prompts = [f["text"] for f in features]
     instruction_lens = [f["len"] for f in features]
+    eval = [f["eval"] for f in features]
 
     processed_audios = []
-    for audio in audios:
-        audio = transform(torch.tensor(audio)) # Apply transformations
+    for i in range(len(audios)):
+        audio = audios[i]
+        if not eval[i]:
+            audio = transform(torch.tensor(audio)) # Apply transformations unless we're evaluating
         audio = torch.mean(audio, dim=0)  # Convert to mono
         audio = audio.numpy().squeeze() # Make sure we have a 1D numpy array
         processed_audios.append(audio)
@@ -239,9 +242,15 @@ def data_collator(features):
         inputs["labels"][i, :prompt_len] = -100
 
     return inputs
-
-dataset = Dataset.from_dict({"audio": audios, "text": text_prompts, "len": instruction_lens})
+dataset = Dataset.from_dict({"audio": audios, "text": text_prompts, "len": instruction_lens, "eval": [False]*len(audios)})
 train_dataset, eval_dataset = torch.utils.data.random_split(dataset, [len(dataset) - 10, 10])
+
+def set_eval(data, idx):
+    if idx in eval_dataset.indices:
+        data["eval"] = True
+    return data
+
+dataset = dataset.map(with_indices=True, function=set_eval)
 
 def compute_metrics(pred):
     labels = pred.label_ids
@@ -264,7 +273,7 @@ training_args = TrainingArguments(
     per_device_eval_batch_size=1,
     gradient_accumulation_steps=8,
     learning_rate=1e-4,
-    num_train_epochs=3,
+    num_train_epochs=10,
     logging_steps=10,
     fp16=True,
     save_strategy="epoch",
