@@ -17,7 +17,7 @@ The necessary python packages are in `requirements.txt`. Python3.10 is required 
 
 To reproduce our results, first you would run the notebook `projet.ipynb` to test DEMUCS and Basic Pitch.
 
-Then you would generate the data using the code in `dataset_generator/`, place it in `training_data/` at the root of this repository's directory. To run qwen2-finetuning.py, you need a GPU with at least 24GB of free VRAM. 16GB of DRAM should be enough. The script takes about 7 hours on Compute Canada with 10 epochs, so feel free to reduce the amount of epochs to 3. Optimal results are seen at around 5-6 epochs. It's important to stdout to a file.
+Then you would generate the data using the code in `dataset_generator/`, place it in `training_data/` at the root of this repository's directory. To run qwen2-finetuning.py, you need a GPU with at least 24GB of free VRAM. 16GB of DRAM should be enough. The script takes about 7 hours on Compute Canada with 10 epochs, so feel free to reduce the amount of epochs to 3. Optimal results are seen at around 5-6 epochs. It's important to send stdout to a file.
 
 This will give you the JSON output in the script logs, which you can paste into a file, split into training and eval json files, encase in brackets, run `sed -i -e '$!s/$/,/' file.json` to add comas at the end of the lines, run `sed -i -e "s/'/\"/g" file.json` to replace the single quotes with JSON-compatible double quotes, modify `make-graphs.py` to read these files, and run it to find the graphs that we've included in the report.
 
