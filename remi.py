@@ -1,10 +1,12 @@
 from miditok import REMI, TokenizerConfig, TokSequence
 from pathlib import Path
 import mido
+import os
 
 DATA_PATH = Path("training_data")
 MIDI_PATHS = DATA_PATH.glob("**/*.mid")
 SAMPLE_PATHS = DATA_PATH.glob("*/*")
+REMI_PATH = "remi.json"
 
 
 def explode_mpe_to_tracks(input_midi_path, output_midi_path):
@@ -40,19 +42,22 @@ def explode_mpe_to_tracks(input_midi_path, output_midi_path):
 
 class RemiCompactor():
     def __init__(self):
-        remi_config = TokenizerConfig(
-            num_velocities=16,
-            use_pitch_bends=True,
-            use_pitch_intervals=True,
-            pitch_bend_range=(-8192, 8191, 16383),
-            use_control_changes=True,
-            use_programs=True,
-            one_token_stream_for_programs=False,
-            use_time_signatures=True,
-            ac_polyphony_track=True
-        )
-        self.remi = REMI(remi_config)
-        self.remi.train(vocab_size=30000, files_paths=list(MIDI_PATHS))
+        if os.path.exists(REMI_PATH):
+            self.remi = REMI(params=Path(REMI_PATH))
+        else:
+            remi_config = TokenizerConfig(
+                num_velocities=16,
+                use_pitch_bends=True,
+                pitch_bend_range=(-8192, 8191, 1024), # We need a lot of values for pitch bends
+                use_control_changes=True,
+                use_programs=True,
+                one_token_stream_for_programs=False,
+                use_time_signatures=True,
+                ac_polyphony_track=True
+            )
+            self.remi = REMI(remi_config)
+            self.remi.train(vocab_size=30000, files_paths=MIDI_PATHS + MUSICNET_MIDI_PATHS)
+            self.remi.save(REMI_PATH)
 
     def midi_to_str(self, path, mpe=False):
         if mpe:
@@ -90,10 +95,9 @@ class RemiCompactor():
         midi.dump_midi(output_path)
         print(f"Successfully saved MIDI to {output_path}")
 
+sample = 'training_data/guitar/sample_0819'
 remi = RemiCompactor()
-mpe = remi.midi_to_str("training_data/guitar/sample_0000/mpe.mid", mpe=True)
-midi = remi.midi_to_str("training_data/guitar/sample_0000/plain.mid")
-remi.str_to_midi(mpe, output_path="test.mid")
+mpe = remi.midi_to_str(f"{sample}/mpe.mid", mpe=True)
+midi = remi.midi_to_str(f"{sample}/plain.mid")
 
-print(midi)
 print(mpe)
