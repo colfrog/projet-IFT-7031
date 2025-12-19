@@ -32,7 +32,7 @@ for audio_path in MUSICNET_AUDIO_PATHS:
 assert len(MUSICNET_AUDIO_PATHS) == len(MUSICNET_MIDI_PATHS)
 
 MODEL_ID = "Qwen/Qwen2-Audio-7B-Instruct"
-OUTPUT_DIR = "./qwen2-audio-finetuned-v3"
+OUTPUT_DIR = "./qwen2-audio-finetuned-v4"
 REMI_PATH = "remi.json"
 MODEL_PATH = Path("/home/lcimon/scratch/hub/models--Qwen--Qwen2-Audio-7B-Instruct/snapshots/0a095220c30b7b31434169c3086508ef3ea5bf0a/")
 DATA_PATH = Path("/home/lcimon/scratch/training_data")
@@ -225,9 +225,8 @@ def data_collator(features):
 
     processed_audios = []
     for i in range(len(audios)):
-        audio = audios[i]
-        if not eval[i]:
-            audio = transform(torch.tensor(audio)) # Apply transformations unless we're evaluating
+        audio = torch.tensor(audios[i])
+        audio = transform(audio) # Apply transformations
         audio = torch.mean(audio, dim=0)  # Convert to mono
         audio = audio.numpy().squeeze() # Make sure we have a 1D numpy array
         processed_audios.append(audio)
@@ -242,15 +241,10 @@ def data_collator(features):
         inputs["labels"][i, :prompt_len] = -100
 
     return inputs
+
 dataset = Dataset.from_dict({"audio": audios, "text": text_prompts, "len": instruction_lens, "eval": [False]*len(audios)})
 train_dataset, eval_dataset = torch.utils.data.random_split(dataset, [len(dataset) - 10, 10])
-
-def set_eval(data, idx):
-    if idx in eval_dataset.indices:
-        data["eval"] = True
-    return data
-
-dataset = dataset.map(with_indices=True, function=set_eval)
+print("Eval samples:", paths[eval_dataset.indices])
 
 def compute_metrics(pred):
     labels = pred.label_ids
