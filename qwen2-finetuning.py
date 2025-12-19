@@ -244,7 +244,10 @@ def data_collator(features):
 
 dataset = Dataset.from_dict({"audio": audios, "text": text_prompts, "len": instruction_lens, "eval": [False]*len(audios)})
 train_dataset, eval_dataset = torch.utils.data.random_split(dataset, [len(dataset) - 10, 10])
-print("Eval samples:", paths[eval_dataset.indices])
+print("Eval samples:")
+for idx in eval_dataset.indices:
+    print(paths[idx])
+print()
 
 def compute_metrics(pred):
     labels = pred.label_ids
