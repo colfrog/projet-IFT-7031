@@ -1,4 +1,5 @@
 import torch
+import torchaudio
 import json
 import librosa
 from datasets import Dataset
@@ -14,12 +15,13 @@ import os
 from pathlib import Path
 
 MODEL_ID = "Qwen/Qwen2-Audio-7B-Instruct"
-OUTPUT_DIR = "./qwen2-audio-finetuned-v3"
+OUTPUT_DIR = "./qwen2-audio-finetuned-v4"
 ADAPTER_PATH = OUTPUT_DIR
 MODEL_PATH = Path("/home/lcimon/scratch/hub/models--Qwen--Qwen2-Audio-7B-Instruct/snapshots/0a095220c30b7b31434169c3086508ef3ea5bf0a/")
 DATA_PATH = Path("/home/lcimon/scratch/training_data")
 MIDI_PATHS = DATA_PATH.glob("**/*.mid")
 SAMPLE_PATHS = DATA_PATH.glob("*/*")
+REMI_PATH = "remi.json"
 MAX_LENGTH = 8192
 
 print(f"CUDA Version: {torch.version.cuda}")
@@ -47,18 +49,22 @@ model = Qwen2AudioForConditionalGeneration.from_pretrained(
 
 class RemiCompactor():
     def __init__(self):
-        remi_config = TokenizerConfig(
-            num_velocities=16,
-            use_pitch_bends=True,
-            pitch_bend_range=(-8192, 8191, 1024), # We need a lot of values for pitch bends
-            use_control_changes=True,
-            use_programs=True,
-            one_token_stream_for_programs=False,
-            use_time_signatures=True,
-            ac_polyphony_track=True
-        )
-        self.remi = REMI(remi_config)
-        self.remi.train(vocab_size=30000, files_paths=list(MIDI_PATHS))
+        if os.path.exists(REMI_PATH):
+            self.remi = REMI(params=Path(REMI_PATH))
+        else:
+            remi_config = TokenizerConfig(
+                num_velocities=16,
+                use_pitch_bends=True,
+                pitch_bend_range=(-8192, 8191, 1024), # We need a lot of values for pitch bends
+                use_control_changes=True,
+                use_programs=True,
+                one_token_stream_for_programs=False,
+                use_time_signatures=True,
+                ac_polyphony_track=True
+            )
+            self.remi = REMI(remi_config)
+            self.remi.train(vocab_size=30000, files_paths=MIDI_PATHS + MUSICNET_MIDI_PATHS)
+            self.remi.save(REMI_PATH)
 
     def explode_mpe_to_tracks(self, input_midi_path, output_midi_path):
         """
@@ -104,12 +110,16 @@ class RemiCompactor():
 
 print("Processing dataset...")
 midi_compactor = RemiCompactor()
-audio_path = "/home/lcimon/scratch/training_data/guitar/sample_0000/audio.wav"
-midi_path = "/home/lcimon/scratch/training_data/guitar/sample_0000/plain.mid"
+audio_path = "output/other.wav"
+midi_path = "output/other.mid"
 
 tokenized_midi = midi_compactor.midi_to_str(midi_path)
+tokenized_midi = tokenized_midi[:len(tokenized_midi)//2]
 
-audio, _ = librosa.load(audio_path, sr=processor.feature_extractor.sampling_rate, mono=True)
+audio, sr = torchaudio.load(audio_path)
+audio = torchaudio.functional.resample(audio, orig_freq=sr, new_freq=processor.feature_extractor.sampling_rate)
+audio = torch.mean(audio, dim=0)
+audio = audio.numpy().squeeze()
 messages = [
     {
         "role": "user",
@@ -120,11 +130,8 @@ messages = [
     }
 ]
 
-# TODO: turn this into a proper testing script with recall and precision
-
 formatted_text = processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
 inputs = processor(text=formatted_text, audio=audio, return_tensors="pt", padding=True, sampling_rate=processor.feature_extractor.sampling_rate)
-print(inputs.keys(), len(inputs['labels']), len(processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)))
 for key in inputs:
     inputs[key] = inputs[key].cuda()
 
