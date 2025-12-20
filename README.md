@@ -1,4 +1,4 @@
-# MLSP Project Team 9
+# MLSP Project Team 6
 
 | File | Description|
 |------|------------|
