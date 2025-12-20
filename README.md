@@ -21,4 +21,4 @@ Then you would generate the data using the code in `dataset_generator/`, place i
 
 This will give you the JSON output in the script logs, which you can paste into a file, split into training and eval json files, encase in brackets, run `sed -i -e '$!s/$/,/' file.json` to add comas at the end of the lines, run `sed -i -e "s/'/\"/g" file.json` to replace the single quotes with JSON-compatible double quotes, modify `make-graphs.py` to read these files, and run it to find the graphs that we've included in the report.
 
-`qwen2-finetuning.py` prints the paths of the files it doesn't train on, which are used for eval. You can then run `qwen2-test.py` on any of these files to verify the inference output on test data, or on any other sample to verify the output on training data.
+`qwen2-finetuning.py` prints the paths of the files it doesn't train on, which are used for eval. You can then run `qwen2-test.py` on any of these files by modifying the audio_path and midi_path variables to verify the inference output on test data, or on any other sample to verify the output on training data.
